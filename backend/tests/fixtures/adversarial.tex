@@ -1,0 +1,42 @@
+% A deliberately hostile fixture. Every construct here has broken a naive
+% LaTeX parser at some point: braces inside comments, escaped braces in body
+% text, percent signs in data, nested lists, and a macro whose name is a
+% prefix of another macro's name.
+
+\documentclass[a4paper,10pt]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{enumitem}
+
+% This comment contains { an unbalanced brace and a stray } and 100% signs.
+% \section{This section is commented out and must never be parsed}
+
+\newcommand{\resumeItem}[1]{\item #1}
+\newcommand{\resumeItemList}[1]{\textbf{#1}}
+
+\begin{document}
+
+\section{Experience}
+
+\textbf{Data Platform Engineer} \hfill 2021--2024 \\
+\textit{Helix Analytics} \hfill Remote
+
+\begin{itemize}[leftmargin=*]
+  \item Cut warehouse spend by 32\% by rewriting partition pruning logic, saving \$48{,}000 annually
+  \item Built an ETL framework processing 2.4B rows/day across 60\% of the company's pipelines
+  \item Handled edge cases with literal braces \{like this\} and underscores in \texttt{table\_names}
+  \item Reduced on-call pages from 40/month to 6/month
+        \begin{itemize}
+          \item This nested item belongs to the bullet above and must not be split out
+          \item Neither must this one
+        \end{itemize}
+  \item Final bullet after a nested list, to check the scanner recovers
+\end{itemize}
+
+\section{Skills}
+
+\begin{itemize}[leftmargin=*]
+  \item Python, Scala, SQL, Airflow, dbt, Snowflake
+  \item Terraform, Docker, Kubernetes, GitHub Actions
+\end{itemize}
+
+\end{document}

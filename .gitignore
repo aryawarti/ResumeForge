@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project tooling
+backend/.tools/
+backend/.tectonic-cache/
+
+# Node / Angular
+node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Secrets and local state
+.env
+.env.local
+*.db
+storage/
+
+# Build output
+*.pdf
+!backend/tests/fixtures/*.pdf
+*.aux
+*.log
+*.out
