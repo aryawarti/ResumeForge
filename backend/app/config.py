@@ -12,7 +12,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -69,6 +69,26 @@ class Settings(BaseSettings):
     worker_concurrency: int = 1
     job_poll_interval_seconds: float = 2.0
     job_stale_after_seconds: int = 600
+
+    @model_validator(mode="after")
+    def _check_secret(self) -> "Settings":
+        """Refuse to run in production with a guessable or short signing key.
+
+        HS256 keys shorter than 32 bytes weaken the signature, and the
+        development default is public. Failing at startup beats issuing
+        forgeable tokens.
+        """
+        if self.environment not in {"development", "test"}:
+            if self.secret_key == "dev-only-change-me":
+                raise ValueError(
+                    "FORGE_SECRET_KEY is still the development default; "
+                    "set a real one before deploying"
+                )
+            if len(self.secret_key.encode()) < 32:
+                raise ValueError(
+                    "FORGE_SECRET_KEY must be at least 32 bytes for HS256"
+                )
+        return self
 
     @property
     def tectonic_binary(self) -> str:
