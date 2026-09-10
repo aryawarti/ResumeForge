@@ -7,6 +7,7 @@ task handles fine at this scale.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -25,6 +26,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _prepare_storage() -> None:
+    """Create the PDF bucket if it is reachable, without blocking startup."""
+    try:
+        await asyncio.to_thread(get_storage().ensure_bucket)
+    except Exception as exc:
+        # Tailoring still works; it is PDF delivery that degrades. Log the
+        # cause plainly rather than a traceback -- "MinIO is not running" is
+        # the usual answer and does not need a stack.
+        logger.warning(
+            "object storage unavailable, PDF delivery will fail until it "
+            "returns (%s: %s)",
+            type(exc).__name__,
+            exc,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -34,12 +51,12 @@ async def lifespan(app: FastAPI):
         # single command.
         await create_all()
 
-    try:
-        get_storage().ensure_bucket()
-    except Exception:
-        # Storage being down should not stop the API from serving; PDF
-        # delivery degrades, tailoring still works.
-        logger.warning("object storage unavailable at startup", exc_info=True)
+    # Off the critical path deliberately. This is a blocking network call, and
+    # when the endpoint is unreachable it costs a connect timeout per retry --
+    # which is time the API spends refusing connections rather than serving
+    # them. Locally that reads as "the backend is broken" when in fact only
+    # MinIO is missing, so nothing here is allowed to delay startup.
+    storage_task = asyncio.create_task(_prepare_storage())
 
     worker = Worker(settings)
     await worker.start()
@@ -48,6 +65,8 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         await worker.stop()
+        # The bucket probe may still be waiting on a connect timeout.
+        storage_task.cancel()
 
 
 app = FastAPI(
@@ -86,7 +105,16 @@ async def health() -> dict[str, object]:
     return {
         "status": "ok",
         "environment": settings.environment,
-        "model": settings.model,
+        "model": (
+            settings.groq_model
+            if settings.llm_provider == "groq"
+            else settings.model
+        ),
         "compiler": compiler,
-        "llm_configured": bool(settings.anthropic_api_key),
+        "llm_provider": settings.llm_provider,
+        "llm_configured": bool(
+            settings.groq_api_key
+            if settings.llm_provider == "groq"
+            else settings.anthropic_api_key
+        ),
     }

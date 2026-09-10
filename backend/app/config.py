@@ -45,9 +45,23 @@ class Settings(BaseSettings):
     s3_region: str = "auto"
     presigned_url_ttl_seconds: int = 900
 
-    # -- Claude --------------------------------------------------------
+    # -- model provider ------------------------------------------------
+    # "anthropic" is the reference target and what the prompts were written
+    # against. "groq" runs the same pipeline on open models behind an
+    # OpenAI-compatible endpoint; the guards are code either way, so the
+    # no-hallucination guarantee does not depend on which is selected.
+    llm_provider: str = "anthropic"
+
     anthropic_api_key: str | None = None
     model: str = "claude-opus-5"
+
+    # -- Groq ----------------------------------------------------------
+    groq_api_key: str | None = None
+    # gpt-oss-120b is the largest instruction-following model on Groq that
+    # supports strict constrained decoding, which the typed edit vocabulary
+    # depends on.
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
     # Reading a posting and planning edits is judgement-heavy work where a
     # wrong call costs a rejected edit or a missed match, so the pipeline
     # runs at high effort by default rather than the cheapest setting.

@@ -23,6 +23,16 @@ from .config import get_settings
 from .latex.compiler import get_compiler
 from .latex.parser import parse_resume
 
+# Resumes and model rationales are full of typographic punctuation -- curly
+# apostrophes, en dashes, non-breaking hyphens. The Windows console defaults
+# to cp1252, which cannot encode any of them, and the result is a crash in
+# the reporting step after the pipeline has already done its work. Replacing
+# what cannot be represented is the right trade here: a report with a plain
+# hyphen in it is still a report.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 
 def cmd_inspect(args: argparse.Namespace) -> int:
     source = pathlib.Path(args.resume).read_text(encoding="utf-8")

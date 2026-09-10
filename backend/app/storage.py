@@ -49,6 +49,13 @@ class Storage:
                 config=Config(
                     signature_version="s3v4",
                     retries={"max_attempts": 3, "mode": "standard"},
+                    # botocore defaults both of these to 60s. Unbounded, a
+                    # storage host that is merely unreachable -- MinIO not
+                    # started, R2 having a bad day -- turns into a three-minute
+                    # hang on whatever called us, which during startup meant
+                    # the API never began serving at all.
+                    connect_timeout=5,
+                    read_timeout=15,
                 ),
             )
         return self._client
