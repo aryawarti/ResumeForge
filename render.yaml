@@ -1,0 +1,38 @@
+# Render blueprint. The free plan has no background worker service, so the
+# job runner lives inside this web service (see app/worker.py).
+#
+# Two free-tier facts worth knowing before deploying:
+#   * Free web services spin down after 15 minutes idle; the next request
+#     waits roughly a minute for cold start.
+#   * Render's own free Postgres expires 30 days after creation. Point
+#     FORGE_DATABASE_URL at Neon instead for a database that persists.
+
+services:
+  - type: web
+    name: resumeforge-api
+    runtime: docker
+    dockerfilePath: ./infra/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: FORGE_ENVIRONMENT
+        value: production
+      - key: FORGE_SECRET_KEY
+        generateValue: true
+      - key: FORGE_ANTHROPIC_API_KEY
+        sync: false
+      - key: FORGE_DATABASE_URL
+        sync: false
+      - key: FORGE_S3_ENDPOINT_URL
+        sync: false
+      - key: FORGE_S3_ACCESS_KEY
+        sync: false
+      - key: FORGE_S3_SECRET_KEY
+        sync: false
+      - key: FORGE_S3_BUCKET
+        value: resumeforge
+      - key: FORGE_CORS_ORIGINS
+        sync: false
+      - key: FORGE_COMPILE_BACKEND
+        value: tectonic

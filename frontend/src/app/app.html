@@ -1,0 +1,28 @@
+<header class="masthead">
+  <div class="masthead__inner">
+    <a class="wordmark" routerLink="/resumes">
+      Resume<span class="wordmark__forge">Forge</span>
+    </a>
+
+    @if (signedIn()) {
+      <nav class="nav" aria-label="Primary">
+        <a routerLink="/resumes" routerLinkActive="is-active">Resumes</a>
+        <a routerLink="/generations" routerLinkActive="is-active">Applications</a>
+        <a routerLink="/gaps" routerLinkActive="is-active">Gaps</a>
+      </nav>
+
+      <div class="account">
+        @if (who()) {
+          <span class="account__who id">{{ who() }}</span>
+        }
+        <button type="button" class="btn btn--ghost btn--sm" (click)="signOut()">
+          Sign out
+        </button>
+      </div>
+    }
+  </div>
+</header>
+
+<main>
+  <router-outlet />
+</main>

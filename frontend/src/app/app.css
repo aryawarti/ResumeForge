@@ -1,0 +1,115 @@
+/* The masthead is a running head: it names the document and gets out of the
+ * way. A single rule separates it from the page, the way a galley proof is
+ * ruled off from its margin. */
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+  background: var(--sheet);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.masthead__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.wordmark {
+  font-family: var(--mono);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wordmark__forge {
+  color: var(--insert);
+}
+
+.nav {
+  display: flex;
+  gap: 1.5rem;
+  margin-right: auto;
+}
+
+.nav a {
+  position: relative;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+  font-weight: 450;
+  color: var(--graphite);
+  text-decoration: none;
+}
+
+.nav a:hover {
+  color: var(--ink);
+}
+
+/* The active mark sits under the word like a proofreader's underline. */
+.nav a.is-active {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.nav a.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1.0625rem;
+  height: 2px;
+  background: var(--insert);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.account__who {
+  color: var(--graphite);
+}
+
+.btn--sm {
+  padding: 0.3125rem 0.625rem;
+  font-size: 0.8125rem;
+}
+
+/* Routed screens do not carry their own page container, so the shell measure
+ * lives here -- one place, every route. */
+main {
+  display: block;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--gutter) 5rem;
+}
+
+/* Below the fold the nav collapses to just the sections; the account controls
+ * stay reachable because signing out should never require a wide window. */
+@media (max-width: 640px) {
+  .masthead__inner {
+    gap: 1rem;
+    padding: 0 1.25rem;
+  }
+
+  .nav {
+    gap: 1rem;
+  }
+
+  .nav a {
+    font-size: 0.8125rem;
+  }
+
+  .account__who {
+    display: none;
+  }
+}
