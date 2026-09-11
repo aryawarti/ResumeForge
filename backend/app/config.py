@@ -9,13 +9,64 @@ code path.
 
 from __future__ import annotations
 
+import json
+import sys
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated, Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import Field, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
+
+# The docker-compose database. Also how production detects that
+# FORGE_DATABASE_URL was never set.
+DEFAULT_DATABASE_URL = "postgresql+asyncpg://forge:forge@localhost:5432/resumeforge"
+
+
+def normalise_database_url(url: str) -> str:
+    """Accept a Postgres connection string exactly as a provider displays it.
+
+    Neon, Render and Supabase hand out ``postgres://`` or ``postgresql://``
+    URLs carrying libpq parameters. The async engine needs the asyncpg driver
+    named, and asyncpg refuses ``sslmode`` and ``channel_binding`` as keyword
+    arguments -- so the pasted string fails on first connect with "unexpected
+    keyword argument 'sslmode'", which reads like a bug in the app rather than
+    a format mismatch. Rewriting it here gives the app and Alembic the same
+    corrected form.
+
+    Pooled hosts (Neon's ``-pooler``, Supabase's pooler) also get asyncpg's
+    prepared-statement cache turned off: under transaction pooling, a statement
+    prepared on one server connection may not exist on the next.
+    """
+    url = url.strip()
+    scheme, separator, rest = url.partition("://")
+    if not separator:
+        return url
+    if scheme in {"postgres", "postgresql"}:
+        scheme = "postgresql+asyncpg"
+    elif scheme != "postgresql+asyncpg":
+        # SQLite, or a deliberately chosen different driver.
+        return url
+
+    parts = urlsplit(f"{scheme}://{rest}")
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+
+    sslmode = query.pop("sslmode", None)
+    # libpq-only; asyncpg negotiates SCRAM channel binding on its own.
+    query.pop("channel_binding", None)
+    if sslmode and "ssl" not in query:
+        query["ssl"] = sslmode
+
+    pooled = "pooler" in (parts.hostname or "")
+    if pooled and "prepared_statement_cache_size" not in query:
+        query["prepared_statement_cache_size"] = "0"
+
+    return urlunsplit(
+        (scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+    )
 
 
 class Settings(BaseSettings):
@@ -32,13 +83,22 @@ class Settings(BaseSettings):
         default="dev-only-change-me",
         description="Signing key for access and refresh tokens.",
     )
-    cors_origins: list[str] = ["http://localhost:4200"]
+    # A JSON list or a comma-separated string -- see _parse_origins.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:4200"]
+    # Optional. Vercel gives every preview deployment its own hostname, which a
+    # fixed list cannot anticipate, e.g. ^https://resumeforge-[a-z0-9-]+\.vercel\.app$
+    cors_origin_regex: str | None = None
 
     # -- database ------------------------------------------------------
-    database_url: str = "postgresql+asyncpg://forge:forge@localhost:5432/resumeforge"
+    # Paste the connection string as your provider shows it; see
+    # normalise_database_url for what gets rewritten and why.
+    database_url: str = DEFAULT_DATABASE_URL
 
-    # -- object storage (S3-compatible: MinIO locally, R2 in production)
-    s3_endpoint_url: str | None = "http://localhost:9000"
+    # -- object storage (optional, any S3-compatible service) -----------
+    # Unset turns PDF download off. Tailoring still works and the .tex is still
+    # offered, so storage can be added after the first deploy rather than
+    # blocking it. See storage_configured.
+    s3_endpoint_url: str | None = None
     s3_bucket: str = "resumeforge"
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
@@ -70,7 +130,11 @@ class Settings(BaseSettings):
 
     # -- compilation ---------------------------------------------------
     compile_backend: str = "auto"
-    tectonic_path: str = str(BACKEND_ROOT / ".tools" / "tectonic.exe")
+    tectonic_path: str = str(
+        BACKEND_ROOT
+        / ".tools"
+        / ("tectonic.exe" if sys.platform == "win32" else "tectonic")
+    )
     compile_timeout_seconds: int = 90
     max_compile_attempts: int = 3
     max_gap_fill_rounds: int = 2
@@ -84,9 +148,33 @@ class Settings(BaseSettings):
     job_poll_interval_seconds: float = 2.0
     job_stale_after_seconds: int = 600
 
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_origins(cls, value: Any) -> Any:
+        """Accept a JSON list or a comma-separated string.
+
+        A hosting dashboard invites pasting one bare URL. Declared as a plain
+        list, pydantic-settings would try to JSON-decode that and refuse to
+        start, with an error that never mentions CORS.
+        """
+        if isinstance(value, str):
+            text = value.strip()
+            value = json.loads(text) if text.startswith("[") else text.split(",")
+        if isinstance(value, (list, tuple)):
+            # The browser's Origin header never ends in a slash, so a pasted
+            # trailing slash would make every request fail CORS silently.
+            origins = (str(item).strip().rstrip("/") for item in value)
+            return [origin for origin in origins if origin]
+        return value
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalise_database_url(cls, value: Any) -> Any:
+        return normalise_database_url(value) if isinstance(value, str) else value
+
     @model_validator(mode="after")
-    def _check_secret(self) -> "Settings":
-        """Refuse to run in production with a guessable or short signing key.
+    def _check_production(self) -> "Settings":
+        """Refuse to start in production with settings that are unsafe or cannot work.
 
         HS256 keys shorter than 32 bytes weaken the signature, and the
         development default is public. Failing at startup beats issuing
@@ -102,6 +190,14 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "FORGE_SECRET_KEY must be at least 32 bytes for HS256"
                 )
+            if not self.database_url or self.database_url == DEFAULT_DATABASE_URL:
+                # Otherwise the first symptom is "connection refused" to
+                # localhost from inside a container, which points everywhere
+                # except at the missing environment variable.
+                raise ValueError(
+                    "FORGE_DATABASE_URL is not set; use your Neon (or other "
+                    "Postgres) connection string"
+                )
         return self
 
     @property
@@ -111,6 +207,16 @@ class Settings(BaseSettings):
             return str(path)
         alt = path.with_suffix("") if path.suffix else path.with_suffix(".exe")
         return str(alt) if alt.exists() else "tectonic"
+
+    @property
+    def storage_configured(self) -> bool:
+        """Whether PDFs can be stored at all.
+
+        Checked before any storage call rather than discovered by failing one:
+        an unreachable endpoint costs a connect timeout per retry, and on a
+        free instance that would add seconds to every generation.
+        """
+        return bool(self.s3_endpoint_url)
 
 
 @lru_cache

@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { AuthService } from '../../core/auth.service';
 
@@ -104,6 +105,13 @@ import { AuthService } from '../../core/auth.service';
 
           @if (error()) {
             <p class="notice notice--error">{{ error() }}</p>
+          }
+
+          @if (slow()) {
+            <p class="notice">
+              Still waiting on the server. On Render's free plan the API
+              sleeps after 15 idle minutes and takes up to a minute to wake.
+            </p>
           }
 
           <button class="btn gate__submit" type="submit" [disabled]="busy()">
@@ -234,6 +242,8 @@ export class SignIn {
   mode = signal<'in' | 'up'>('in');
   busy = signal(false);
   error = signal('');
+  /** Set when a request takes longer than a warm server ever would. */
+  slow = signal(false);
 
   name = '';
   email = '';
@@ -242,13 +252,20 @@ export class SignIn {
   submit() {
     this.error.set('');
     this.busy.set(true);
+    this.slow.set(false);
+    const slowTimer = setTimeout(() => this.slow.set(true), 5000);
 
     const request =
       this.mode() === 'up'
         ? this.auth.register(this.email, this.password, this.name)
         : this.auth.login(this.email, this.password);
 
-    request.subscribe({
+    const settled = () => {
+      clearTimeout(slowTimer);
+      this.slow.set(false);
+    };
+
+    request.pipe(finalize(settled)).subscribe({
       next: () => {
         this.busy.set(false);
         const next = this.route.snapshot.queryParamMap.get('next') ?? '/resumes';

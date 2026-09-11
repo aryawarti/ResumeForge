@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 async def _prepare_storage() -> None:
     """Create the PDF bucket if it is reachable, without blocking startup."""
+    if not get_settings().storage_configured:
+        logger.info("object storage not configured; PDF download is off")
+        return
     try:
         await asyncio.to_thread(get_storage().ensure_bucket)
     except Exception as exc:
@@ -46,9 +49,13 @@ async def _prepare_storage() -> None:
 async def lifespan(app: FastAPI):
     settings = get_settings()
 
-    if settings.environment == "development":
-        # Alembic owns the schema in production; this keeps local setup to a
-        # single command.
+    local_sqlite = settings.database_url.startswith("sqlite")
+    if settings.environment == "development" and local_sqlite:
+        # A local SQLite file is created on the spot, so development is one
+        # command. Postgres, local or hosted, is only ever changed by
+        # `alembic upgrade head`: create_all on a Postgres database leaves
+        # tables Alembic does not know it owns, and the first migration then
+        # fails on them. tests/test_migrations.py keeps both schemas identical.
         await create_all()
 
     # Off the critical path deliberately. This is a blocking network call, and
@@ -79,6 +86,8 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins,
+    # Blank in a dashboard means "not set", not "match the empty string".
+    allow_origin_regex=get_settings().cors_origin_regex or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -117,4 +126,5 @@ async def health() -> dict[str, object]:
             if settings.llm_provider == "groq"
             else settings.anthropic_api_key
         ),
+        "storage_configured": settings.storage_configured,
     }

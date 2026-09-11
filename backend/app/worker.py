@@ -248,7 +248,7 @@ class Worker:
         gaps = build_gap_report(result.job_spec, result.coverage)
 
         pdf_key = ""
-        if result.pdf:
+        if result.pdf and self.settings.storage_configured:
             try:
                 storage = get_storage()
                 pdf_key = f"generations/{generation_id}.pdf"

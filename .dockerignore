@@ -1,0 +1,33 @@
+# Build context for infra/Dockerfile is the repository root.
+#
+# The entries that matter are not about size. `.env` would bake whatever API
+# key is on the building machine into every layer of the image. `.tools/` would
+# ship a Windows tectonic.exe into a Linux container, where it cannot run but
+# would still satisfy the installer's "already installed" check. And `.venv/`
+# would copy compiled wheels for the wrong platform.
+
+**/.git
+**/.env
+**/.env.*
+!**/.env.example
+
+backend/.tools/
+backend/.tectonic-cache/
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+**/.pytest_cache/
+**/.hypothesis/
+**/.mypy_cache/
+**/.ruff_cache/
+
+**/*.db
+**/storage/
+**/*.pdf
+**/*.aux
+**/*.log
+
+# The API image does not serve the frontend; Vercel builds that separately.
+frontend/
+docs/

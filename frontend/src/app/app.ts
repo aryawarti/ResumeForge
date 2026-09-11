@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
+import { API } from './core/api.config';
 import { AuthService } from './core/auth.service';
 
 @Component({
@@ -26,6 +27,11 @@ export class App {
   private loaded = signal(false);
 
   constructor() {
+    // Render's free plan sleeps the API after 15 idle minutes and needs about a
+    // minute to wake. Starting that on page load means it is usually awake by
+    // the time someone has typed a password. Nothing waits on the result.
+    fetch(`${API}/health`).catch(() => undefined);
+
     // A reload restores the token from storage but not the user behind it.
     effect(() => {
       if (this.signedIn() && !this.loaded()) {

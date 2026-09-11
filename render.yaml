@@ -1,29 +1,68 @@
-# Render blueprint. The free plan has no background worker service, so the
-# job runner lives inside this web service (see app/worker.py).
+# Render blueprint for the ResumeForge API. DEPLOY.md walks through using it.
 #
-# Two free-tier facts worth knowing before deploying:
-#   * Free web services spin down after 15 minutes idle; the next request
-#     waits roughly a minute for cold start.
-#   * Render's own free Postgres expires 30 days after creation. Point
-#     FORGE_DATABASE_URL at Neon instead for a database that persists.
+# Why it looks like this:
+#   * Free plans have no background worker service, so the job runner lives
+#     inside this web service (app/worker.py).
+#   * Free web services sleep after 15 minutes without traffic, and the next
+#     request waits about a minute. The SPA pings /api/health on page load so
+#     the wake-up starts before anyone has typed a password.
+#   * Render's own free Postgres is deleted 30 days after creation, so the
+#     database is external (Neon).
+#   * Migrations run in the container's start command (infra/Dockerfile), so
+#     they apply on every deploy, on any plan.
+#
+# `sync: false` values are prompted for when the Blueprint is created and are
+# never stored in this file. The optional ones may be left blank.
 
 services:
   - type: web
     name: resumeforge-api
     runtime: docker
+    plan: free
+    # Where the API runs. Fixed once the service exists, and it should match
+    # your Neon region: every request makes several database round trips.
+    # One of: oregon, ohio, virginia, frankfurt, singapore.
+    region: oregon
     dockerfilePath: ./infra/Dockerfile
     dockerContext: .
-    plan: free
     healthCheckPath: /api/health
+    # Frontend-only commits do not rebuild the API image.
+    buildFilter:
+      paths:
+        - backend/**
+        - infra/**
+        - render.yaml
     envVars:
       - key: FORGE_ENVIRONMENT
         value: production
       - key: FORGE_SECRET_KEY
         generateValue: true
-      - key: FORGE_ANTHROPIC_API_KEY
-        sync: false
+
+      # Required. Your Neon connection string, pasted exactly as Neon shows it.
       - key: FORGE_DATABASE_URL
         sync: false
+      # Required once the frontend exists: your Vercel URL, no trailing slash.
+      - key: FORGE_CORS_ORIGINS
+        sync: false
+      # Optional. A regex that also admits Vercel preview deployments.
+      - key: FORGE_CORS_ORIGIN_REGEX
+        sync: false
+
+      - key: FORGE_LLM_PROVIDER
+        value: groq
+      - key: FORGE_GROQ_MODEL
+        value: openai/gpt-oss-120b
+      # Required for whichever provider FORGE_LLM_PROVIDER names.
+      - key: FORGE_GROQ_API_KEY
+        sync: false
+      - key: FORGE_ANTHROPIC_API_KEY
+        sync: false
+
+      - key: FORGE_COMPILE_BACKEND
+        value: tectonic
+
+      # Optional. PDF download through any S3-compatible store (R2, B2, ...).
+      # Leave blank and tailoring still works; the .tex is offered instead.
       - key: FORGE_S3_ENDPOINT_URL
         sync: false
       - key: FORGE_S3_ACCESS_KEY
@@ -32,7 +71,3 @@ services:
         sync: false
       - key: FORGE_S3_BUCKET
         value: resumeforge
-      - key: FORGE_CORS_ORIGINS
-        sync: false
-      - key: FORGE_COMPILE_BACKEND
-        value: tectonic

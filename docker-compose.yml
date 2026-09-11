@@ -1,9 +1,13 @@
-# Local development infrastructure.
+# Optional local infrastructure. The default backend/.env uses SQLite and no
+# object storage, so none of this is needed to run the app.
 #
-# Production uses Neon (Postgres) and Cloudflare R2 (S3) instead of these two
-# containers, but the application code is identical -- only DATABASE_URL and
-# the S3 endpoint change. That is the whole reason for choosing S3-compatible
-# storage rather than a filesystem in dev.
+#   postgres  to develop against the database production uses. Postgres is
+#             only ever changed by migrations: run `alembic upgrade head`.
+#   minio     to exercise PDF download; set FORGE_S3_ENDPOINT_URL to
+#             http://localhost:9000.
+#
+# Production swaps these for Neon and any S3-compatible store (R2, B2, ...).
+# The application code is identical; only the URLs change.
 
 services:
   postgres:

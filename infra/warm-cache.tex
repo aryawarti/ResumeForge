@@ -1,0 +1,25 @@
+% Compiled once while the image builds, so the Tectonic package cache ships
+% inside it. These are the packages common resume templates load. Anything a
+% real template needs beyond them is fetched by the smoke compile that runs
+% later in the build, against the actual fixtures.
+\documentclass[letterpaper,11pt]{article}
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\begin{document}
+\section{Warm}
+\begin{itemize}
+  \item cache
+\end{itemize}
+\begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+  left & right \\
+\end{tabular*}
+\end{document}

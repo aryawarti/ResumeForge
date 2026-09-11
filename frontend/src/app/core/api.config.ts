@@ -1,25 +1,26 @@
-/** Base URL for the API.
+/** Base URL for the API, resolved when the app loads.
  *
- * Vercel serves the built SPA as static files and the API lives on Render, so
- * in production these are two different origins. That is deliberate rather
- * than accidental: proxying through Vercel would put a serverless hop in front
- * of the SSE progress stream, and buffering there is exactly what you do not
- * want on a sixty-second job. Talking to Render directly keeps the stream
- * unbuffered; the cost is CORS, which the API allows via FORGE_CORS_ORIGINS.
+ * In order:
  *
- * EventSource cannot send an Authorization header, which is why the progress
- * stream authenticates with a short-lived ticket in the query string instead.
+ * 1. `window.__FORGE_API__`, set by /config.js. That file is generated at build
+ *    time from the FORGE_API_URL environment variable (scripts/write-config.mjs),
+ *    so a Vercel deployment is pointed at its API through a Vercel setting and a
+ *    redeploy, never a source edit.
+ * 2. The local uvicorn, when the page itself is served from localhost.
+ * 3. Same-origin /api, for a host that serves the SPA and the API together.
  *
- * Set PRODUCTION_API to your Render URL once deployed. `__FORGE_API__` on
- * window overrides everything, which is useful for pointing a preview build at
- * a branch deploy without rebuilding.
+ * In production the API is on a different origin (Render) from the SPA
+ * (Vercel). That is deliberate: proxying through Vercel would put a serverless
+ * hop in front of the SSE progress stream, and buffering there is exactly what
+ * a sixty-second job cannot afford. The cost is CORS, which the API allows via
+ * FORGE_CORS_ORIGINS. EventSource cannot send an Authorization header, which is
+ * why the progress stream authenticates with a short-lived query-string ticket.
  */
 
-const PRODUCTION_API = 'https://resumeforge-api.onrender.com/api';
+const configured = (globalThis as { __FORGE_API__?: string }).__FORGE_API__;
 
 const isLocal =
   location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
 export const API =
-  (globalThis as { __FORGE_API__?: string }).__FORGE_API__ ??
-  (isLocal ? 'http://localhost:8000/api' : PRODUCTION_API);
+  configured ?? (isLocal ? 'http://localhost:8000/api' : '/api');
