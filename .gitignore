@@ -16,11 +16,30 @@ node_modules/
 frontend/dist/
 frontend/.angular/
 
-# Secrets and local state
+# Secrets and local state.
+#
+# `.env.*` is deliberately broad: .env.production, .env.render and .env.local
+# are the variants people add later and forget to ignore. .env.example is the
+# one exception, because it contains placeholders only.
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
 *.db
+*.sqlite
+*.sqlite3
 storage/
+
+# Editors, operating systems, local agent state
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
 
 # Build output
 *.pdf

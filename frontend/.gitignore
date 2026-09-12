@@ -20,13 +20,13 @@ yarn-error.log
 .settings/
 *.sublime-workspace
 
-# Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/mcp.json
+# Visual Studio Code.
+#
+# Angular's default ignore file re-includes a handful of these so a team can
+# share editor config. This project does not publish them: they are personal
+# setup, and the fewer files in a public repository that nobody reviews, the
+# better.
+.vscode/
 .history/*
 
 # Miscellaneous
