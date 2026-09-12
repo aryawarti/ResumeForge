@@ -107,7 +107,3 @@ and the migrations describe the same schema.
 ## Deploying
 
 Free tier throughout: Vercel, Render, Neon, Groq. See [DEPLOY.md](DEPLOY.md).
-
-## License
-
-MIT
